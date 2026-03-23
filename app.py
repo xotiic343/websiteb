@@ -1,168 +1,130 @@
-from flask import Flask, render_template, request, jsonify, session, send_from_directory
-from flask_cors import CORS
+from fastapi import FastAPI, HTTPException, Depends, status
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from typing import List, Optional
 import os
 import json
-import secrets
 from datetime import datetime
 
-app = Flask(__name__, static_folder='.', static_url_path='')
-app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(32))
-CORS(app)
+app = FastAPI(title="XOTIIC Plaza API")
 
-# Password from environment variable or default
-OWNER_PASSWORD = os.environ.get('OWNER_PASSWORD')
+# CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["https://website-nu-sable-42.vercel.app"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-# Data file path
-DATA_FILE = 'data.json'
+# Password
+OWNER_PASSWORD = os.environ.get("OWNER_PASSWORD")
+DATA_FILE = "data.json"
 
-def load_data():
+# Models
+class Project(BaseModel):
+    title: str = ""
+    category: str = "website"
+    description: str = ""
+    tags: str = ""
+    emoji: str = "◈"
+    link: str = ""
+    download: str = ""
+
+class Skill(BaseModel):
+    name: str = ""
+    level: int = 80
+
+class SiteData(BaseModel):
+    name: str = "XOTIIC"
+    bio: str = "Full-stack developer specializing in modern websites and powerful Discord bots."
+    status: str = "Building the future"
+    projectCount: str = ""
+    downloadCount: str = ""
+    userCount: str = ""
+    visitorCount: str = ""
+    email: str = "xotiic@example.com"
+    discord: str = "xotiic"
+    github: str = "github.com/xotiic"
+    twitter: str = "@xotiic"
+    terminalSkills: str = "HTML/CSS • JavaScript • Python • Discord.js • React"
+    projects: List[Project] = []
+    skills: List[Skill] = []
+
+class LoginRequest(BaseModel):
+    password: str
+
+# Helper functions
+def load_data() -> SiteData:
     """Load data from JSON file"""
+    default_data = SiteData()
+    
     if os.path.exists(DATA_FILE):
         try:
             with open(DATA_FILE, 'r') as f:
-                return json.load(f)
-        except:
-            return {
-                'projects': [],
-                'skills': [],
-                'stats': {
-                    'project_count': '—',
-                    'download_count': '—',
-                    'user_count': '—',
-                    'visitor_count': '1337'
-                },
-                'personal': {
-                    'name': 'XOTIIC',
-                    'bio': 'Full-stack developer specializing in modern websites and powerful Discord bots.',
-                    'status': 'Building the future'
-                },
-                'contact': {
-                    'email': 'xotiic@example.com',
-                    'discord': 'xotiic',
-                    'github': 'github.com/xotiic',
-                    'twitter': '@xotiic'
-                },
-                'terminal': {
-                    'skills': 'HTML/CSS • JavaScript • Python • Discord.js'
-                }
-            }
-    return {
-        'projects': [],
-        'skills': [],
-        'stats': {
-            'project_count': '—',
-            'download_count': '—',
-            'user_count': '—',
-            'visitor_count': '0'
-        },
-        'personal': {
-            'name': 'XOTIIC',
-            'bio': 'Full-stack developer specializing in modern websites and powerful Discord bots.',
-            'status': 'Building the future'
-        },
-        'contact': {
-            'email': 'xotiic@example.com',
-            'discord': 'xotiic',
-            'github': 'github.com/xotiic',
-            'twitter': '@xotiic'
-        },
-        'terminal': {
-            'skills': 'HTML/CSS • JavaScript • Python • Discord.js'
-        }
-    }
+                data = json.load(f)
+                # Convert projects and skills to proper objects
+                if 'projects' in data:
+                    data['projects'] = [Project(**p) for p in data['projects']]
+                if 'skills' in data:
+                    data['skills'] = [Skill(**s) for s in data['skills']]
+                return SiteData(**data)
+        except Exception as e:
+            print(f"Error loading data: {e}")
+            return default_data
+    return default_data
 
-def save_data(data):
+def save_data(data: SiteData):
     """Save data to JSON file"""
     with open(DATA_FILE, 'w') as f:
-        json.dump(data, f, indent=2)
+        json.dump(data.dict(), f, indent=2, default=str)
 
-# Update visitor count on each visit
-def increment_visitor():
+# Routes
+@app.get("/")
+async def serve_index():
+    """Serve the main HTML file"""
+    return FileResponse("index.html")
+
+@app.get("/owner")
+async def serve_owner():
+    """Serve the same HTML, frontend handles owner view"""
+    return FileResponse("index.html")
+
+@app.get("/api/data")
+async def get_data():
+    """Get all site data"""
     data = load_data()
-    current = data['stats'].get('visitor_count', '0')
-    if current != '—':
-        try:
-            num = int(str(current).replace(',', ''))
-            data['stats']['visitor_count'] = str(num + 1)
-        except:
-            data['stats']['visitor_count'] = '1'
-    save_data(data)
-    return data['stats']['visitor_count']
-
-@app.route('/')
-def index():
-    """Serve the main page"""
-    increment_visitor()
-    return send_from_directory('.', 'index.html')
-
-@app.route('/owner')
-def owner_route():
-    """Owner login page - served by frontend, but backend handles API"""
-    return send_from_directory('.', 'index.html')
-
-@app.route('/api/data', methods=['GET'])
-def get_data():
-    """Get all data"""
-    data = load_data()
-    return jsonify(data)
-
-@app.route('/api/data', methods=['POST'])
-def update_data():
-    """Update data - requires authentication"""
-    auth = request.headers.get('Authorization')
-    if auth != OWNER_PASSWORD:
-        return jsonify({'error': 'Unauthorized'}), 401
-    
-    data = request.json
-    if data:
-        # Update stats
-        if 'stats' in data:
-            for key, value in data['stats'].items():
-                if value:
-                    data['stats'][key] = value
-        
-        # Update personal info
-        if 'personal' in data:
-            for key, value in data['personal'].items():
-                if value:
-                    data['personal'][key] = value
-        
-        # Update contact
-        if 'contact' in data:
-            for key, value in data['contact'].items():
-                if value:
-                    data['contact'][key] = value
-        
-        # Update terminal
-        if 'terminal' in data:
-            for key, value in data['terminal'].items():
-                if value:
-                    data['terminal'][key] = value
-        
-        # Update projects
-        if 'projects' in data:
-            data['projects'] = data['projects']
-        
-        # Update skills
-        if 'skills' in data:
-            data['skills'] = data['skills']
-        
+    # Increment visitor count
+    try:
+        visitor = int(data.visitorCount) if data.visitorCount and data.visitorCount != '—' else 0
+        data.visitorCount = str(visitor + 1)
         save_data(data)
-        return jsonify({'success': True, 'message': 'Data saved successfully'})
+    except:
+        pass
+    return data
+
+@app.post("/api/login")
+async def login(login: LoginRequest):
+    """Owner login"""
+    if login.password == OWNER_PASSWORD:
+        return {"success": True, "message": "Logged in"}
+    raise HTTPException(status_code=401, detail="Invalid password")
+
+@app.post("/api/data")
+async def update_data(data: SiteData, password: str = None):
+    """Update site data - requires password"""
+    if password != OWNER_PASSWORD:
+        raise HTTPException(status_code=401, detail="Unauthorized")
     
-    return jsonify({'error': 'No data provided'}), 400
+    save_data(data)
+    return {"success": True, "message": "Data saved successfully"}
 
-@app.route('/api/visitor', methods=['GET'])
-def get_visitor():
-    """Get visitor count"""
-    data = load_data()
-    return jsonify({'count': data['stats'].get('visitor_count', '0')})
+@app.get("/api/health")
+async def health_check():
+    """Health check endpoint"""
+    return {"status": "ok", "timestamp": datetime.now().isoformat()}
 
-@app.route('/api/health', methods=['GET'])
-def health():
-    """Health check for Render"""
-    return jsonify({'status': 'ok', 'timestamp': datetime.now().isoformat()})
-
-if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=False)
+# Serve static files
+app.mount("/static", StaticFiles(directory="."), name="static")
