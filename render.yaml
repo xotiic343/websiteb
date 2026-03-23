@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: xotiic-plaza
+    runtime: python
+    repo: https://github.com/xotiic343/websiteb
+    plan: free
+    region: oregon
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app
+    envVars:
+      - key: OWNER_PASSWORD
+        value: 
+      - key: SECRET_KEY
+        generateValue: true
+      - key: PYTHON_VERSION
+        value: 3.11.0
