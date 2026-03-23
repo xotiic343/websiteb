@@ -43,7 +43,7 @@ def load_data():
                     'twitter': '@xotiic'
                 },
                 'terminal': {
-                    'skills': 'HTML/CSS • JavaScript • Python • Discord.js • React'
+                    'skills': 'HTML/CSS • JavaScript • Python • Discord.js'
                 }
             }
     return {
@@ -53,7 +53,7 @@ def load_data():
             'project_count': '—',
             'download_count': '—',
             'user_count': '—',
-            'visitor_count': '1337'
+            'visitor_count': '0'
         },
         'personal': {
             'name': 'XOTIIC',
@@ -67,7 +67,7 @@ def load_data():
             'twitter': '@xotiic'
         },
         'terminal': {
-            'skills': 'HTML/CSS • JavaScript • Python • Discord.js • React'
+            'skills': 'HTML/CSS • JavaScript • Python • Discord.js'
         }
     }
 
